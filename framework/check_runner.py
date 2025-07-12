@@ -72,13 +72,19 @@ class CheckRunner:
             
             # Initialize S3 client
             connection_config = self.config['connection']
+            s3_logger = logging.getLogger('s3_checker.s3_client')
+            s3_logger.setLevel(self.logger.level)
+            # Copy handlers from main logger
+            for handler in self.logger.handlers:
+                s3_logger.addHandler(handler)
+                
             self.s3_client = S3Client(
                 endpoint_url=connection_config['endpoint_url'],
                 access_key=connection_config['access_key'],
                 secret_key=connection_config['secret_key'],
                 region=connection_config.get('region', 'us-east-1'),
                 verify_ssl=connection_config.get('verify_ssl', False),
-                logger=self.logger,
+                logger=s3_logger,
                 max_retries=connection_config.get('max_retries', 3)
             )
             
@@ -171,9 +177,15 @@ class CheckRunner:
             category_start_time = time.time()
             
             try:
-                # Create check instance
+                # Create check instance with scope-specific logger
                 check_class = self.check_classes[check_name]
-                check_instance = check_class(self.s3_client, self.config, self.logger)
+                scope_logger = logging.getLogger(f's3_checker.{check_name}')
+                scope_logger.setLevel(self.logger.level)
+                # Copy handlers from main logger
+                for handler in self.logger.handlers:
+                    scope_logger.addHandler(handler)
+                
+                check_instance = check_class(self.s3_client, self.config, scope_logger)
                 
                 # Run checks
                 check_results = check_instance.run_checks()

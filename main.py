@@ -64,7 +64,7 @@ class S3CompatibilityChecker:
         ]
     
     def setup_logging(self, log_level: str = 'INFO', log_file: str = None, 
-                     console_output: bool = True) -> logging.Logger:
+                     console_output: bool = True, scope_name: str = 's3_checker') -> logging.Logger:
         """
         Set up logging configuration.
         
@@ -72,19 +72,26 @@ class S3CompatibilityChecker:
             log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
             log_file: Log file path (optional)
             console_output: Whether to output to console
+            scope_name: Name to use in log messages (e.g., specific check scope)
             
         Returns:
             Configured logger instance
         """
-        # Create logger
-        logger = logging.getLogger('s3_checker')
+        # Create logger with scope-specific name
+        logger = logging.getLogger(scope_name)
         logger.setLevel(getattr(logging, log_level.upper()))
         
         # Clear any existing handlers
         logger.handlers.clear()
         
-        # Create formatter
-        formatter = logging.Formatter(
+        # Create formatter for console (with colors)
+        console_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        
+        # Create formatter for file (no colors)
+        file_formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
@@ -96,18 +103,21 @@ class S3CompatibilityChecker:
             
             # Use colored formatter for console if available
             if COLORS_AVAILABLE:
-                console_formatter = ColoredFormatter()
+                colored_formatter = ColoredFormatter(
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S'
+                )
+                console_handler.setFormatter(colored_formatter)
             else:
-                console_formatter = formatter
+                console_handler.setFormatter(console_formatter)
             
-            console_handler.setFormatter(console_formatter)
             logger.addHandler(console_handler)
         
-        # File handler
+        # File handler (always without colors)
         if log_file:
             file_handler = logging.FileHandler(log_file)
             file_handler.setLevel(logging.DEBUG)  # Always debug level for file
-            file_handler.setFormatter(formatter)
+            file_handler.setFormatter(file_formatter)
             logger.addHandler(file_handler)
         
         return logger
@@ -302,7 +312,19 @@ Examples:
                 print(f"{Fore.RED}✗ Cannot disable console output without log file{Style.RESET_ALL}")
                 return False
             
-            self.logger = self.setup_logging(log_level, log_file, console_output)
+            # Determine scope name for logging
+            scope_name = 's3_checker'
+            if hasattr(self.args, 'scope') and self.args.scope:
+                if self.args.scope == 'all':
+                    scope_name = 's3_checker'
+                else:
+                    scopes = [s.strip() for s in self.args.scope.split(',')]
+                    if len(scopes) == 1:
+                        scope_name = f's3_checker.{scopes[0]}'
+                    else:
+                        scope_name = f's3_checker.multi_scope'
+            
+            self.logger = self.setup_logging(log_level, log_file, console_output, scope_name)
             
             # Initialize check runner
             self.check_runner = CheckRunner(self.config_manager, self.logger)
@@ -470,7 +492,7 @@ Examples:
 
 
 class ColoredFormatter(logging.Formatter):
-    """Custom log formatter with colors."""
+    """Custom log formatter with colors for console output only."""
     
     COLORS = {
         'DEBUG': Fore.BLUE,
@@ -481,9 +503,11 @@ class ColoredFormatter(logging.Formatter):
     }
     
     def format(self, record):
-        log_color = self.COLORS.get(record.levelname, '')
-        record.levelname = f"{log_color}{record.levelname}{Style.RESET_ALL}"
-        return super().format(record)
+        # Create a copy of the record to avoid affecting other handlers
+        record_copy = logging.makeLogRecord(record.__dict__)
+        log_color = self.COLORS.get(record_copy.levelname, '')
+        record_copy.levelname = f"{log_color}{record_copy.levelname}{Style.RESET_ALL}"
+        return super().format(record_copy)
 
 
 def main():

@@ -224,13 +224,20 @@ CATEGORY RESULTS:
 ```
 
 ### Log Files
-Detailed logs are written to the specified log file with timestamps and full error details:
+Detailed logs are written to the specified log file with timestamps and full error details. Log files contain plain text without color codes, while console output includes colors for better readability:
 
 ```
-2024-01-15 10:30:15 - s3_checker - INFO - Starting bucket compatibility checks...
-2024-01-15 10:30:15 - s3_checker - INFO - ✓ bucket_creation: Successfully created bucket
-2024-01-15 10:30:16 - s3_checker - ERROR - ✗ bucket_versioning: Failed versioning operations: InvalidRequest
+2024-01-15 10:30:15 - s3_checker.buckets - INFO - Starting bucket compatibility checks...
+2024-01-15 10:30:15 - s3_checker.buckets - INFO - ✓ bucket_creation: Successfully created bucket
+2024-01-15 10:30:16 - s3_checker.versioning - ERROR - ✗ bucket_versioning: Failed versioning operations: InvalidRequest
+2024-01-15 10:30:17 - s3_checker.s3_client - DEBUG - S3 Request: put_object with params: {'Bucket': 'test-bucket', 'Key': 'test-object'}
 ```
+
+**Logging Features:**
+- **Scope-specific loggers**: Each check category has its own logger name (e.g., `s3_checker.buckets`, `s3_checker.objects`)
+- **Clean file output**: Log files contain no ANSI color codes, ensuring compatibility with log analysis tools
+- **Colored console**: Console output includes colors for improved readability during interactive use
+- **Two detail levels**: Standard (INFO) shows test results, Debug (DEBUG) includes detailed request/response information
 
 ## Extending the Framework
 
