@@ -78,6 +78,11 @@ class CheckRunner:
             for handler in self.logger.handlers:
                 s3_logger.addHandler(handler)
                 
+            # Get enhanced logging options
+            logging_config = self.config.get('logging', {})
+            enable_raw_logging = logging_config.get('enable_raw_logging', False)
+            enable_boto_debug = logging_config.get('enable_boto_debug', False)
+            
             self.s3_client = S3Client(
                 endpoint_url=connection_config['endpoint_url'],
                 access_key=connection_config['access_key'],
@@ -85,7 +90,9 @@ class CheckRunner:
                 region=connection_config.get('region', 'us-east-1'),
                 verify_ssl=connection_config.get('verify_ssl', False),
                 logger=s3_logger,
-                max_retries=connection_config.get('max_retries', 3)
+                max_retries=connection_config.get('max_retries', 3),
+                enable_raw_logging=enable_raw_logging,
+                enable_boto_debug=enable_boto_debug
             )
             
             self.logger.info("S3 client initialized successfully")

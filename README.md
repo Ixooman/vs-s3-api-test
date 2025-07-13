@@ -9,6 +9,8 @@ A comprehensive testing framework for verifying S3 API compatibility in custom s
 - **Error Condition Testing**: Verifies proper error handling for invalid requests and edge cases
 - **Extensible Framework**: Easy to add new test categories and customize for specific needs
 - **Detailed Reporting**: Console output and file logging with configurable detail levels
+- **Enhanced Protocol Logging**: Raw HTTP request/response logging for maximum S3 API validation
+- **boto3 Debug Logging**: Full AWS SDK debug logging for protocol-level analysis
 - **Configuration Driven**: INI-based configuration for easy setup and customization
 - **Automated Cleanup**: Automatically cleans up test resources to avoid storage pollution
 
@@ -115,6 +117,10 @@ log_level = INFO                       # Log level (DEBUG, INFO, WARNING, ERROR)
 log_file = s3_checker.log             # Log file name
 console_output = true                  # Show console output
 detailed_errors = true                 # Show detailed error info
+
+# Enhanced logging for maximum S3 API validation confidence
+enable_raw_logging = false             # Raw HTTP request/response logging
+enable_boto_debug = false              # Full boto3/botocore debug logging
 ```
 
 ### Check Selection
@@ -187,6 +193,42 @@ python main.py --scope all --export-results detailed_results.json
 
 # Quiet mode for automated testing
 python main.py --scope all --quiet --export-results results.json
+```
+
+### Enhanced Protocol Validation
+For maximum S3 API validation confidence, enable enhanced logging modes:
+
+```bash
+# Enable raw HTTP request/response logging for protocol-level debugging
+# Edit config.ini: enable_raw_logging = true
+python main.py --scope buckets --log-level debug
+
+# Enable full boto3/botocore debug logging (very verbose)
+# Edit config.ini: enable_boto_debug = true
+python main.py --scope objects --log-level debug
+
+# Maximum logging for protocol compliance verification
+# Edit config.ini: enable_raw_logging = true, enable_boto_debug = true
+python main.py --scope all --log-level debug --log-file protocol_debug.log
+```
+
+**Enhanced Logging Output Examples:**
+
+Raw HTTP Request/Response Logging:
+```
+RAW REQUEST - Method: PUT
+RAW REQUEST - URI: /test-bucket/test-object
+RAW REQUEST - Headers: {'Content-Type': 'application/octet-stream', 'Authorization': '***MASKED***'}
+RAW RESPONSE - Status: 200
+RAW RESPONSE - Headers: {'etag': '"d41d8cd98f00b204e9800998ecf8427e"', 'server': 'MinIO'}
+S3 Response Fields: {'ETag': '"d41d8cd98f00b204e9800998ecf8427e"', 'ContentLength': 1024}
+```
+
+boto3 Debug Logging:
+```
+botocore.auth [DEBUG] Calculating signature using v4 auth.
+botocore.endpoint [DEBUG] Making request for OperationModel(name=PutObject)
+botocore.parsers [DEBUG] Response headers: {'ETag': '"..."', 'Content-Length': '1024'}
 ```
 
 ## Understanding Results

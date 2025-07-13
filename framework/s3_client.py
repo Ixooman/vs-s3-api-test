@@ -7,10 +7,13 @@ retry logic, and detailed logging for debugging S3 compatibility issues.
 
 import logging
 import time
+import json
 from typing import Dict, Any, Optional
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError, BotoCoreError
+from botocore.awsrequest import AWSRequest
+from botocore.endpoint import logger as endpoint_logger
 
 
 class S3ClientError(Exception):
@@ -38,7 +41,8 @@ class S3Client:
     
     def __init__(self, endpoint_url: str, access_key: str, secret_key: str, 
                  region: str = 'us-east-1', verify_ssl: bool = False, 
-                 logger: logging.Logger = None, max_retries: int = 3):
+                 logger: logging.Logger = None, max_retries: int = 3,
+                 enable_raw_logging: bool = False, enable_boto_debug: bool = False):
         """
         Initialize the S3 client wrapper.
         
@@ -57,7 +61,12 @@ class S3Client:
         self.region = region
         self.verify_ssl = verify_ssl
         self.max_retries = max_retries
+        self.enable_raw_logging = enable_raw_logging
+        self.enable_boto_debug = enable_boto_debug
         self.logger = logger or logging.getLogger(__name__)
+        
+        # Configure enhanced logging if requested
+        self._configure_enhanced_logging()
         
         # Configure boto3 client
         config = Config(
@@ -79,15 +88,141 @@ class S3Client:
         )
         
         self.logger.info(f"S3 client initialized for endpoint: {endpoint_url}")
+        
+        # Add event handlers for raw request/response logging
+        if self.enable_raw_logging:
+            self._setup_raw_logging()
+    
+    def _configure_enhanced_logging(self):
+        """Configure enhanced boto3/botocore logging if enabled."""
+        if self.enable_boto_debug:
+            # Enable full boto3 and botocore debug logging
+            boto3.set_stream_logger('boto3.resources', logging.DEBUG)
+            boto3.set_stream_logger('botocore', logging.DEBUG)
+            boto3.set_stream_logger('botocore.credentials', logging.DEBUG)
+            boto3.set_stream_logger('botocore.endpoint', logging.DEBUG)
+            boto3.set_stream_logger('botocore.auth', logging.DEBUG)
+            boto3.set_stream_logger('botocore.retryhandler', logging.DEBUG)
+            
+            self.logger.info("Enhanced boto3/botocore debug logging enabled")
+    
+    def _setup_raw_logging(self):
+        """Setup raw HTTP request/response logging."""
+        try:
+            # Register event handlers for S3 operations
+            self.client.meta.events.register('before-call.*.*', self._log_raw_request)
+            self.client.meta.events.register('after-call.*.*', self._log_raw_response)
+            self.client.meta.events.register('before-parameter-build.*.*', self._log_parameters)
+            
+            self.logger.info("Raw HTTP request/response logging enabled")
+        except Exception as e:
+            self.logger.warning(f"Failed to setup raw logging: {e}. Continuing without raw logging.")
+    
+    def _log_raw_request(self, event_name=None, model=None, **kwargs):
+        """Log raw HTTP request details."""
+        if hasattr(model, 'http') and self.enable_raw_logging:
+            request_dict = model.http
+            self.logger.debug(f"RAW REQUEST - Method: {request_dict.get('method', 'Unknown')}")
+            self.logger.debug(f"RAW REQUEST - URI: {request_dict.get('uri', 'Unknown')}")
+            
+            # Log headers (mask authorization)
+            headers = request_dict.get('headers', {})
+            safe_headers = {k: ('***MASKED***' if 'authorization' in k.lower() else v) 
+                          for k, v in headers.items()}
+            self.logger.debug(f"RAW REQUEST - Headers: {safe_headers}")
+            
+            # Log body (truncate if too large)
+            body = request_dict.get('body')
+            if body:
+                if isinstance(body, bytes):
+                    if len(body) > 1024:
+                        self.logger.debug(f"RAW REQUEST - Body: <{len(body)} bytes>")
+                    else:
+                        self.logger.debug(f"RAW REQUEST - Body: {body[:500]}{'...' if len(body) > 500 else ''}")
+                else:
+                    self.logger.debug(f"RAW REQUEST - Body: {str(body)[:500]}")
+    
+    def _log_raw_response(self, event_name=None, parsed=None, **kwargs):
+        """Log raw HTTP response details."""
+        if parsed and self.enable_raw_logging:
+            # Log response metadata
+            response_metadata = parsed.get('ResponseMetadata', {})
+            self.logger.debug(f"RAW RESPONSE - Status: {response_metadata.get('HTTPStatusCode', 'Unknown')}")
+            
+            # Log response headers (mask sensitive ones)
+            headers = response_metadata.get('HTTPHeaders', {})
+            safe_headers = {k: ('***MASKED***' if any(sensitive in k.lower() 
+                               for sensitive in ['authorization', 'signature', 'token']) else v)
+                          for k, v in headers.items()}
+            self.logger.debug(f"RAW RESPONSE - Headers: {safe_headers}")
+            
+            # Log response body structure (without sensitive data)
+            response_copy = dict(parsed)
+            if 'ResponseMetadata' in response_copy:
+                del response_copy['ResponseMetadata']
+            
+            # Truncate large responses
+            response_str = str(response_copy)
+            if len(response_str) > 1000:
+                self.logger.debug(f"RAW RESPONSE - Body: {response_str[:500]}...")
+            else:
+                self.logger.debug(f"RAW RESPONSE - Body: {response_str}")
+    
+    def _log_parameters(self, event_name=None, params=None, **kwargs):
+        """Log API call parameters before they're processed."""
+        if params and self.enable_raw_logging:
+            # Create safe copy of parameters (mask sensitive data)
+            safe_params = dict(params)
+            
+            # Mask body content if it's large
+            if 'Body' in safe_params:
+                body = safe_params['Body']
+                if hasattr(body, '__len__') and len(body) > 1024:
+                    safe_params['Body'] = f"<{len(body)} bytes>"
+                elif isinstance(body, bytes) and len(body) > 100:
+                    safe_params['Body'] = f"<{len(body)} bytes>"
+            
+            self.logger.debug(f"API PARAMETERS - {event_name}: {safe_params}")
     
     def _log_request(self, operation: str, **kwargs):
         """Log the request details."""
-        self.logger.debug(f"S3 Request: {operation} with params: {kwargs}")
+        # Create safe copy for logging (mask large bodies)
+        safe_kwargs = dict(kwargs)
+        if 'Body' in safe_kwargs:
+            body = safe_kwargs['Body']
+            if hasattr(body, '__len__') and len(body) > 1024:
+                safe_kwargs['Body'] = f"<{len(body)} bytes>"
+            elif isinstance(body, bytes) and len(body) > 100:
+                safe_kwargs['Body'] = f"<{len(body)} bytes>"
+        
+        self.logger.debug(f"S3 Request: {operation} with params: {safe_kwargs}")
     
     def _log_response(self, operation: str, response: Dict[str, Any], duration: float):
         """Log the response details."""
         status_code = response.get('ResponseMetadata', {}).get('HTTPStatusCode', 'Unknown')
+        
+        # Log basic response info
         self.logger.debug(f"S3 Response: {operation} completed in {duration:.3f}s with status {status_code}")
+        
+        # Log additional response details if raw logging is enabled
+        if self.enable_raw_logging:
+            response_metadata = response.get('ResponseMetadata', {})
+            request_id = response_metadata.get('RequestId', 'Unknown')
+            host_id = response_metadata.get('HostId', 'Unknown')
+            
+            self.logger.debug(f"S3 Response Details - RequestId: {request_id}, HostId: {host_id}")
+            
+            # Log important response fields (avoid logging large data)
+            important_fields = ['ETag', 'VersionId', 'UploadId', 'ContentLength', 'ContentType', 
+                              'LastModified', 'ServerSideEncryption', 'Bucket', 'Key']
+            
+            logged_fields = {}
+            for field in important_fields:
+                if field in response:
+                    logged_fields[field] = response[field]
+            
+            if logged_fields:
+                self.logger.debug(f"S3 Response Fields: {logged_fields}")
     
     def _handle_error(self, error: Exception, operation: str, **kwargs) -> S3ClientError:
         """
