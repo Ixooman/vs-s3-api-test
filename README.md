@@ -281,6 +281,52 @@ Detailed logs are written to the specified log file with timestamps and full err
 - **Colored console**: Console output includes colors for improved readability during interactive use
 - **Two detail levels**: Standard (INFO) shows test results, Debug (DEBUG) includes detailed request/response information
 
+## S3 API Compatibility Extension Options
+
+The framework can be extended to test additional S3 API features and edge cases for comprehensive compatibility validation:
+
+### Advanced S3 API Features
+- **S3 Select**: SQL query execution on objects (CSV, JSON, Parquet)
+- **Object Lock**: Write-once-read-many (WORM) functionality and retention policies
+- **Cross-Origin Resource Sharing (CORS)**: Browser-based access configuration
+- **Website Hosting**: Static website configuration and error documents
+- **Notification Events**: Bucket event notifications and webhooks
+- **Inventory Reports**: Automated bucket inventory generation
+- **Metrics and Analytics**: CloudWatch-style metrics collection
+
+### Storage Classes and Lifecycle
+- **Storage Class Transitions**: Standard, IA, Glacier, Deep Archive
+- **Lifecycle Policies**: Automated object transitions and expiration
+- **Intelligent Tiering**: Automatic cost optimization features
+- **Restoration Operations**: Object retrieval from archival storage
+
+### Advanced Security Features
+- **Server-Side Encryption**: SSE-S3, SSE-KMS, SSE-C encryption modes
+- **Bucket Policies**: Complex access control policy validation
+- **Access Control Lists (ACLs)**: Fine-grained permission testing
+- **Pre-signed URLs**: Temporary access URL generation and validation
+- **Request Payment**: Requester-pays bucket configuration
+
+### Multi-Region and Replication
+- **Cross-Region Replication (CRR)**: Automatic object replication
+- **Same-Region Replication (SRR)**: In-region redundancy
+- **Transfer Acceleration**: CloudFront-accelerated uploads
+- **Multi-Region Access Points**: Global endpoint management
+
+### Enterprise Features
+- **Access Points**: VPC-specific access control
+- **S3 Batch Operations**: Large-scale object processing
+- **Directory Buckets**: Hierarchical namespace support
+- **Express One Zone**: High-performance storage class
+
+### API Edge Cases and Compliance
+- **HTTP/2 Protocol Support**: Modern protocol compatibility
+- **IPv6 Connectivity**: Dual-stack network support
+- **Large Object Handling**: >5TB objects and extreme multipart scenarios
+- **Rate Limiting**: Throttling behavior and retry mechanisms
+- **Error Code Compliance**: Complete AWS error response validation
+- **Header Validation**: S3-specific HTTP headers and metadata limits
+
 ## Extending the Framework
 
 ### Adding New Check Categories
