@@ -78,6 +78,7 @@ The framework includes the following test categories:
 - **versioning**: Object versioning (enable/disable, multiple versions, version-specific operations)
 - **tagging**: Bucket and object tagging (put, get, delete tags)
 - **attributes**: Object attributes and metadata (get-object-attributes, storage class)
+- **metadata**: Comprehensive metadata testing (standard headers, custom metadata, encoding, size limits)
 
 ### Specialized Testing
 - **range_requests**: Partial object retrieval using HTTP Range headers
@@ -132,6 +133,7 @@ multipart = true
 versioning = true
 tagging = true
 attributes = true
+metadata = true
 range_requests = true
 error_conditions = true
 sync = true

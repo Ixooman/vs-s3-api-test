@@ -45,6 +45,7 @@ class CheckRunner:
             'versioning': 'checks.check_versioning.VersioningChecks',
             'tagging': 'checks.check_tagging.TaggingChecks',
             'attributes': 'checks.check_attributes.AttributeChecks',
+            'metadata': 'checks.check_metadata.MetadataChecks',
             'range_requests': 'checks.check_range_requests.RangeRequestChecks',
             'error_conditions': 'checks.check_error_conditions.ErrorConditionChecks',
             'sync': 'checks.check_sync.SyncChecks'

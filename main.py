@@ -59,7 +59,7 @@ class S3CompatibilityChecker:
         # Available check scopes
         self.available_scopes = [
             'buckets', 'objects', 'multipart', 'versioning', 
-            'tagging', 'attributes', 'range_requests', 
+            'tagging', 'attributes', 'metadata', 'range_requests', 
             'error_conditions', 'sync', 'all'
         ]
     
@@ -243,6 +243,7 @@ Examples:
             'versioning': 'Object versioning (enable versioning, multiple versions)',
             'tagging': 'Bucket and object tagging (put, get, delete tags)',
             'attributes': 'Object attributes and metadata operations',
+            'metadata': 'Comprehensive metadata testing (standard headers, custom metadata, encoding, limits)',
             'range_requests': 'Partial object retrieval using HTTP Range headers',
             'error_conditions': 'Error handling and invalid request scenarios',
             'sync': 'Directory synchronization operations',

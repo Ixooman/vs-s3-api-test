@@ -350,6 +350,74 @@ This document provides a comprehensive list of all checks performed by the S3 Co
 - **Expected**: HTTP 200 with `ObjectParts.Parts` array, or HTTP 400/501 if not supported
 - **Validates**: Multipart object parts attribute retrieval (advanced feature)
 
+## Metadata
+
+### standard_metadata_headers (Positive)
+- **S3 Operation**: `put_object`, `head_object`
+- **Parameters**: `Bucket=<test-bucket>`, `Key=<object>`, `ContentType=application/json`, `ContentEncoding=gzip`, `ContentDisposition=attachment; filename="test.json"`, `ContentLanguage=en-US`, `CacheControl=max-age=3600, no-cache`, `Expires=Wed, 21 Oct 2025 07:28:00 GMT`
+- **Expected**: HTTP 200, head_object returns ≥80% of standard metadata headers preserved
+- **Validates**: Standard S3 metadata header preservation (Content-Type, Content-Encoding, etc.)
+
+### custom_metadata_preservation (Positive)
+- **S3 Operation**: `put_object`, `head_object`
+- **Parameters**: `Bucket=<test-bucket>`, `Key=<object>`, `Metadata={'author': 'S3CompatibilityChecker', 'project': 'metadata-testing', 'version': '1.0.0', 'environment': 'test', 'numeric-value': '42', 'boolean-value': 'true', 'special-chars': 'test@example.com'}`
+- **Expected**: HTTP 200, head_object returns ≥90% of custom metadata fields preserved
+- **Validates**: Custom metadata (x-amz-meta-*) preservation and retrieval
+
+### metadata_encoding_handling (Positive/Negative)
+- **S3 Operation**: `put_object`
+- **Parameters**: `Bucket=<test-bucket>`, `Key=<object>`, `Metadata={'ascii-text': 'simple-ascii-value', 'utf8-text': 'café-München-日本', 'spaces': 'value with spaces', 'url-encoded': 'test%40example.com', 'special-symbols': '!@#$%^&*()', 'numbers': '123456789', 'mixed': 'Test_123-Value@2024'}`
+- **Expected**: HTTP 400 for non-ASCII characters (proper S3 spec compliance), ≥70% of valid encodings preserved
+- **Validates**: Metadata encoding validation and character set compliance
+
+### large_metadata_value_rejection (Negative)
+- **S3 Operation**: `put_object`
+- **Parameters**: `Bucket=<test-bucket>`, `Key=<object>`, `Metadata={'large-field': '<2KB-value>'}`
+- **Expected**: HTTP 400/413 (Payload Too Large) for excessive individual metadata values
+- **Validates**: Individual metadata value size limits (AWS: ~2KB per field)
+
+### total_metadata_size_check (Positive/Negative)
+- **S3 Operation**: `put_object`
+- **Parameters**: `Bucket=<test-bucket>`, `Key=<object>`, `Metadata=<100-fields-with-large-values>`
+- **Expected**: Acceptance if total size <8KB, HTTP 400/413 if exceeding limits
+- **Validates**: Total metadata size limits (AWS: ~8KB total)
+
+### metadata_case_preservation (Positive)
+- **S3 Operation**: `put_object`, `head_object`
+- **Parameters**: `Bucket=<test-bucket>`, `Key=<object>`, `Metadata={'lowercase': 'value1', 'UPPERCASE': 'value2', 'MixedCase': 'value3', 'camelCase': 'value4'}`
+- **Expected**: HTTP 200, ≥50% of metadata keys preserve exact case
+- **Validates**: Metadata key case sensitivity behavior
+
+### metadata_copy_preservation (Positive)
+- **S3 Operation**: `put_object`, `copy_object`, `head_object`
+- **Parameters**: `CopySource={'Bucket': '<bucket>', 'Key': '<source-key>'}`, no `MetadataDirective`
+- **Expected**: HTTP 200, ≥80% of source metadata fields preserved in destination
+- **Validates**: Default metadata preservation during copy operations
+
+### metadata_copy_replacement (Positive)
+- **S3 Operation**: `copy_object`, `head_object`
+- **Parameters**: `CopySource={'Bucket': '<bucket>', 'Key': '<source-key>'}`, `Metadata=<new-metadata>`, `MetadataDirective=REPLACE`
+- **Expected**: HTTP 200, new metadata set correctly, old metadata completely removed
+- **Validates**: Metadata replacement during copy operations with REPLACE directive
+
+### system_user_metadata_distinction (Positive)
+- **S3 Operation**: `put_object`, `head_object`
+- **Parameters**: `Bucket=<test-bucket>`, `Key=<object>`, `Metadata=<user-metadata>`, `ContentType=application/json`, `CacheControl=no-cache`
+- **Expected**: HTTP 200, system metadata (ContentType, ETag, etc.) separate from user metadata, both preserved
+- **Validates**: Proper distinction between AWS system metadata and user metadata
+
+### empty_metadata_values (Positive)
+- **S3 Operation**: `put_object`, `head_object`
+- **Parameters**: `Bucket=<test-bucket>`, `Key=<object>`, `Metadata={'empty-field': '', 'normal-field': 'value'}`
+- **Expected**: HTTP 200, normal field preserved, empty field handling varies by implementation
+- **Validates**: Empty metadata value handling behavior
+
+### no_metadata_baseline (Positive)
+- **S3 Operation**: `put_object`, `head_object`
+- **Parameters**: `Bucket=<test-bucket>`, `Key=<object>`, no `Metadata` parameter
+- **Expected**: HTTP 200, user metadata count = 0, only system metadata present
+- **Validates**: Baseline behavior with no user metadata
+
 ## Range Requests
 
 ### range_single_byte_first_byte (Positive)
