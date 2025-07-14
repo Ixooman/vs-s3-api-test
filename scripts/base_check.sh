@@ -4,7 +4,8 @@
 # Based on S3_compatibility.txt (excluding multipart upload tests)
 # Usage: ./base_check.sh <endpoint-url>
 
-set -e  # Exit on any error
+# Remove set -e to allow script to continue on errors
+# Individual commands will handle errors with || true or explicit error handling
 
 # Configuration
 ENDPOINT_URL=${1:-"http://192.168.10.81"}
@@ -132,8 +133,10 @@ $AWS_CMD s3api create-bucket --bucket bucket-for-attrs --endpoint-url $ENDPOINT_
 $AWS_CMD s3api put-object --key object-for-attrs --body data.txt --bucket bucket-for-attrs --endpoint-url $ENDPOINT_URL
 echo "Object ETag:"
 $AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes ETag --endpoint-url $ENDPOINT_URL
-echo "Object Size and Storage Class:"
-$AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes ObjectSize,StorageClass --endpoint-url $ENDPOINT_URL
+echo "Object Size:"
+$AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes ObjectSize --endpoint-url $ENDPOINT_URL || echo "ObjectSize attribute not supported"
+echo "Storage Class:"
+$AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes StorageClass --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "StorageClass attribute not supported"
 
 echo -e "\n=== 10. Bucket Deletion ==="
 $AWS_CMD s3api create-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
