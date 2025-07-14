@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # S3 Simple check connection script
-# Usage: ./check_connection.sh <endpoint-url>
+# Usage: ./check_connection.sh [endpoint-url]
 
 # Configuration
 ENDPOINT_URL=${1:-"http://192.168.10.81"}
