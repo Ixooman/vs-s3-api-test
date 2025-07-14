@@ -84,7 +84,7 @@ echo "Copied content:"
 cat data-out-copy.txt
 $AWS_CMD s3api delete-object --bucket new-bucket --key simple-object --endpoint-url $ENDPOINT_URL
 echo "Checking deleted object (should fail):"
-$AWS_CMD s3api head-object --bucket new-bucket --key simple-object --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Object deleted successfully"
+$AWS_CMD s3api head-object --bucket new-bucket --key simple-object --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 5. Object Listing ==="
 $AWS_CMD s3api list-objects --bucket new-bucket --endpoint-url $ENDPOINT_URL
@@ -102,7 +102,7 @@ echo "Object versions:"
 $AWS_CMD s3api list-object-versions --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
 $AWS_CMD s3api delete-object --bucket versioned-bucket --key versioned-object --endpoint-url $ENDPOINT_URL
 echo "Checking deleted object (should fail):"
-$AWS_CMD s3api head-object --bucket versioned-bucket --key versioned-object --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Current version deleted"
+$AWS_CMD s3api head-object --bucket versioned-bucket --key versioned-object --endpoint-url $ENDPOINT_URL
 echo "Remaining versions:"
 $AWS_CMD s3api list-object-versions --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
 
@@ -113,7 +113,7 @@ echo "Bucket tags:"
 $AWS_CMD s3api get-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
 $AWS_CMD s3api delete-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
 echo "Bucket tags after deletion (should fail):"
-$AWS_CMD s3api get-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Bucket tags deleted successfully"
+$AWS_CMD s3api get-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 8. Object Tagging ==="
 echo "some data" > data.txt
@@ -143,6 +143,6 @@ $AWS_CMD s3api create-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT
 $AWS_CMD s3api head-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
 $AWS_CMD s3api delete-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
 echo "Checking deleted bucket (should fail):"
-$AWS_CMD s3api head-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "Bucket deleted successfully"
+$AWS_CMD s3api head-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== Test Completed Successfully! ==="
