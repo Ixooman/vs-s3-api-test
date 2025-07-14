@@ -11,6 +11,12 @@
 ENDPOINT_URL=${1:-"http://192.168.10.81"}
 AWS_CMD="aws --no-verify-ssl"
 
+# Helper function to show command before execution
+run_cmd() {
+    echo "$ $*"
+    "$@"
+}
+
 echo "=== S3 Basic Compatibility Test ==="
 echo "Endpoint: $ENDPOINT_URL"
 echo "======================================"
@@ -59,90 +65,90 @@ cleanup() {
 trap cleanup EXIT
 
 echo "=== 1. Bucket Creation and Listing ==="
-$AWS_CMD s3api create-bucket --bucket new-bucket --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api list-buckets --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api create-bucket --bucket new-bucket --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api list-buckets --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 2. Object Creation ==="
 echo "test" > data.txt
-$AWS_CMD s3api put-object --bucket new-bucket --key new-object --body data.txt --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api head-object --bucket new-bucket --key new-object --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-object --bucket new-bucket --key new-object --body data.txt --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api head-object --bucket new-bucket --key new-object --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 3. Directory Sync ==="
 mkdir -p new-bucket && cd new-bucket && touch file1.txt file2.txt file3.txt && cd ..
-$AWS_CMD s3 sync new-bucket s3://new-bucket --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api list-objects --bucket new-bucket --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3 sync new-bucket s3://new-bucket --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api list-objects --bucket new-bucket --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 4. Object Lifecycle ==="
 echo 'some data' > data.txt
-$AWS_CMD s3api put-object --bucket new-bucket --key simple-object --body data.txt --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api get-object --bucket new-bucket --key simple-object data-out.txt --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-object --bucket new-bucket --key simple-object --body data.txt --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api get-object --bucket new-bucket --key simple-object data-out.txt --endpoint-url $ENDPOINT_URL
 echo "Downloaded content:"
 cat data-out.txt
-$AWS_CMD s3api copy-object --copy-source new-bucket/simple-object --bucket new-bucket --key simple-object-copy --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api get-object --bucket new-bucket --key simple-object-copy data-out-copy.txt --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api copy-object --copy-source new-bucket/simple-object --bucket new-bucket --key simple-object-copy --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api get-object --bucket new-bucket --key simple-object-copy data-out-copy.txt --endpoint-url $ENDPOINT_URL
 echo "Copied content:"
 cat data-out-copy.txt
-$AWS_CMD s3api delete-object --bucket new-bucket --key simple-object --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api delete-object --bucket new-bucket --key simple-object --endpoint-url $ENDPOINT_URL
 echo "Checking deleted object (should fail):"
-$AWS_CMD s3api head-object --bucket new-bucket --key simple-object --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api head-object --bucket new-bucket --key simple-object --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 5. Object Listing ==="
-$AWS_CMD s3api list-objects --bucket new-bucket --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api list-objects-v2 --bucket new-bucket --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api list-objects --bucket new-bucket --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api list-objects-v2 --bucket new-bucket --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 6. Versioning ==="
-$AWS_CMD s3api create-bucket --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api put-bucket-versioning --bucket versioned-bucket --versioning-configuration Status=Enabled --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api get-bucket-versioning --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api create-bucket --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-bucket-versioning --bucket versioned-bucket --versioning-configuration Status=Enabled --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api get-bucket-versioning --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
 echo 'version1' > data.txt
-$AWS_CMD s3api put-object --bucket versioned-bucket --key versioned-object --body data.txt --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-object --bucket versioned-bucket --key versioned-object --body data.txt --endpoint-url $ENDPOINT_URL
 echo 'version2' > data.txt
-$AWS_CMD s3api put-object --bucket versioned-bucket --key versioned-object --body data.txt --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-object --bucket versioned-bucket --key versioned-object --body data.txt --endpoint-url $ENDPOINT_URL
 echo "Object versions:"
-$AWS_CMD s3api list-object-versions --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api delete-object --bucket versioned-bucket --key versioned-object --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api list-object-versions --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api delete-object --bucket versioned-bucket --key versioned-object --endpoint-url $ENDPOINT_URL
 echo "Checking deleted object (should fail):"
-$AWS_CMD s3api head-object --bucket versioned-bucket --key versioned-object --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api head-object --bucket versioned-bucket --key versioned-object --endpoint-url $ENDPOINT_URL
 echo "Remaining versions:"
-$AWS_CMD s3api list-object-versions --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api list-object-versions --bucket versioned-bucket --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 7. Bucket Tagging ==="
-$AWS_CMD s3api create-bucket --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api put-bucket-tagging --bucket bucket-for-tag --tagging '{"TagSet":[{"Key":"some-key","Value":"some-value"}]}' --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api create-bucket --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-bucket-tagging --bucket bucket-for-tag --tagging '{"TagSet":[{"Key":"some-key","Value":"some-value"}]}' --endpoint-url $ENDPOINT_URL
 echo "Bucket tags:"
-$AWS_CMD s3api get-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api delete-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api get-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api delete-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
 echo "Bucket tags after deletion (should fail):"
-$AWS_CMD s3api get-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api get-bucket-tagging --bucket bucket-for-tag --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 8. Object Tagging ==="
 echo "some data" > data.txt
-$AWS_CMD s3api put-object --bucket bucket-for-tag --key object-for-tag --body data.txt --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api put-object-tagging --bucket bucket-for-tag --key object-for-tag --tagging '{"TagSet":[{"Key":"some-object-key","Value":"some-object-value"}]}' --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-object --bucket bucket-for-tag --key object-for-tag --body data.txt --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-object-tagging --bucket bucket-for-tag --key object-for-tag --tagging '{"TagSet":[{"Key":"some-object-key","Value":"some-object-value"}]}' --endpoint-url $ENDPOINT_URL
 echo "Object tags:"
-$AWS_CMD s3api get-object-tagging --bucket bucket-for-tag --key object-for-tag --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api put-object-tagging --bucket bucket-for-tag --key object-for-tag --tagging '{"TagSet":[{"Key":"some-new-object-key","Value":"some-new-object-value"}]}' --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api get-object-tagging --bucket bucket-for-tag --key object-for-tag --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-object-tagging --bucket bucket-for-tag --key object-for-tag --tagging '{"TagSet":[{"Key":"some-new-object-key","Value":"some-new-object-value"}]}' --endpoint-url $ENDPOINT_URL
 echo "Updated object tags:"
-$AWS_CMD s3api get-object-tagging --bucket bucket-for-tag --key object-for-tag --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api delete-object-tagging --bucket bucket-for-tag --key object-for-tag --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api get-object-tagging --bucket bucket-for-tag --key object-for-tag --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api delete-object-tagging --bucket bucket-for-tag --key object-for-tag --endpoint-url $ENDPOINT_URL
 echo "Object tags after deletion (should be empty):"
-$AWS_CMD s3api get-object-tagging --bucket bucket-for-tag --key object-for-tag --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api get-object-tagging --bucket bucket-for-tag --key object-for-tag --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== 9. Object Attributes (Basic) ==="
-$AWS_CMD s3api create-bucket --bucket bucket-for-attrs --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api put-object --key object-for-attrs --body data.txt --bucket bucket-for-attrs --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api create-bucket --bucket bucket-for-attrs --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api put-object --key object-for-attrs --body data.txt --bucket bucket-for-attrs --endpoint-url $ENDPOINT_URL
 echo "Object ETag:"
-$AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes ETag --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes ETag --endpoint-url $ENDPOINT_URL
 echo "Object Size:"
-$AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes ObjectSize --endpoint-url $ENDPOINT_URL || echo "ObjectSize attribute not supported"
+run_cmd $AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes ObjectSize --endpoint-url $ENDPOINT_URL || echo "ObjectSize attribute not supported"
 echo "Storage Class:"
-$AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes StorageClass --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "StorageClass attribute not supported"
+run_cmd $AWS_CMD s3api get-object-attributes --key object-for-attrs --bucket bucket-for-attrs --object-attributes StorageClass --endpoint-url $ENDPOINT_URL 2>/dev/null || echo "StorageClass attribute not supported"
 
 echo -e "\n=== 10. Bucket Deletion ==="
-$AWS_CMD s3api create-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api head-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
-$AWS_CMD s3api delete-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api create-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api head-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api delete-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
 echo "Checking deleted bucket (should fail):"
-$AWS_CMD s3api head-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
+run_cmd $AWS_CMD s3api head-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
 
 echo -e "\n=== Test Completed Successfully! ==="
