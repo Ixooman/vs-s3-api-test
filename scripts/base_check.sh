@@ -5,6 +5,7 @@
 # Usage: ./base_check.sh <endpoint-url>
 
 # Remove set -e to allow script to continue on errors
+# set -e
 # Individual commands will handle errors with || true or explicit error handling
 
 # Configuration
@@ -15,6 +16,7 @@ AWS_CMD="aws --no-verify-ssl"
 run_cmd() {
     echo "$ $*"
     "$@"
+    echo
 }
 
 echo "=== S3 Basic Compatibility Test ==="
@@ -151,4 +153,4 @@ run_cmd $AWS_CMD s3api delete-bucket --bucket bucket-for-delete --endpoint-url $
 echo "Checking deleted bucket (should fail):"
 run_cmd $AWS_CMD s3api head-bucket --bucket bucket-for-delete --endpoint-url $ENDPOINT_URL
 
-echo -e "\n=== Test Completed Successfully! ==="
+echo -e "\n=== Test Completed! ===\n"
