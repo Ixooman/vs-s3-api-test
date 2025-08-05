@@ -227,7 +227,6 @@ validate_system_dependencies() {
     log "Validating system dependencies..."
     
     local missing_deps=()
-    local optional_deps=()
     
     # Required dependencies
     local required_commands=("jq" "split" "md5sum" "stat" "dd" "cat")
@@ -264,12 +263,27 @@ validate_system_dependencies() {
     done
     
     # Check for alternative commands if primary ones are missing
-    if [[ " ${missing_deps[@]} " =~ " md5sum " ]]; then
+    local found_md5sum=false
+    for dep in "${missing_deps[@]}"; do
+        if [[ "$dep" == "md5sum" ]]; then
+            found_md5sum=true
+            break
+        fi
+    done
+    
+    if [[ "$found_md5sum" == "true" ]]; then
         if command -v md5 &> /dev/null; then
             log_warning "md5sum not found, but md5 is available (macOS style)"
             log_error "This script requires GNU md5sum for Ubuntu Linux"
-            missing_deps=(${missing_deps[@]/md5sum/})
-            missing_deps+=("md5sum (GNU version required)")
+            # Remove md5sum from missing_deps and add GNU version requirement
+            local temp_deps=()
+            for dep in "${missing_deps[@]}"; do
+                if [[ "$dep" != "md5sum" ]]; then
+                    temp_deps+=("$dep")
+                fi
+            done
+            temp_deps+=("md5sum (GNU version required)")
+            missing_deps=("${temp_deps[@]}")
         fi
     fi
     
@@ -291,12 +305,26 @@ validate_system_dependencies() {
                     install_packages+=("jq")
                     ;;
                 "split"|"stat"|*"coreutils"*)
-                    if [[ ! " ${install_packages[@]} " =~ " coreutils " ]]; then
+                    local found_coreutils=false
+                    for pkg in "${install_packages[@]}"; do
+                        if [[ "$pkg" == "coreutils" ]]; then
+                            found_coreutils=true
+                            break
+                        fi
+                    done
+                    if [[ "$found_coreutils" == "false" ]]; then
                         install_packages+=("coreutils")
                     fi
                     ;;
                 "md5sum"*)
-                    if [[ ! " ${install_packages[@]} " =~ " coreutils " ]]; then
+                    local found_coreutils=false
+                    for pkg in "${install_packages[@]}"; do
+                        if [[ "$pkg" == "coreutils" ]]; then
+                            found_coreutils=true
+                            break
+                        fi
+                    done
+                    if [[ "$found_coreutils" == "false" ]]; then
                         install_packages+=("coreutils")
                     fi
                     ;;
@@ -320,15 +348,13 @@ validate_system_dependencies() {
     fi
     
     # Test stat command with our specific usage
-    local test_size
-    if ! test_size=$(stat -c%s /dev/null 2>/dev/null); then
+    if ! stat -c%s /dev/null &>/dev/null; then
         log_error "stat command exists but does not support -c%s format (GNU version required)"
         return 1
     fi
     
     # Test md5sum functionality
-    local test_hash
-    if ! test_hash=$(echo "test" | md5sum | cut -d' ' -f1 2>/dev/null); then
+    if ! echo "test" | md5sum | cut -d' ' -f1 &>/dev/null; then
         log_error "md5sum command exists but cannot generate checksums properly"
         return 1
     fi
@@ -363,7 +389,8 @@ validate_aws_environment() {
     fi
     
     # Check AWS CLI version
-    local aws_version=$(aws --version 2>&1 | head -n1)
+    local aws_version
+    aws_version=$(aws --version 2>&1 | head -n1)
     log_verbose "AWS CLI version: $aws_version"
     
     # Check AWS credentials and connectivity with S3-specific validation
@@ -374,7 +401,8 @@ validate_aws_environment() {
         return 1
     fi
     
-    local bucket_count=$(aws s3api list-buckets --endpoint-url "$ENDPOINT_URL" --no-verify-ssl --query 'length(Buckets)' --output text 2>/dev/null || echo "0")
+    local bucket_count
+    bucket_count=$(aws s3api list-buckets --endpoint-url "$ENDPOINT_URL" --no-verify-ssl --query 'length(Buckets)' --output text 2>/dev/null || echo "0")
     log_verbose "Successfully connected to S3 endpoint"
     log_verbose "Existing buckets found: $bucket_count"
     log_verbose "Using endpoint: $ENDPOINT_URL"
@@ -418,7 +446,8 @@ validate_bucket_name() {
 # Check disk space
 check_disk_space() {
     local required_space=100  # MB
-    local available_space=$(df /tmp | awk 'NR==2 {print int($4/1024)}')
+    local available_space
+    available_space=$(df /tmp | awk 'NR==2 {print int($4/1024)}')
     
     if [ "$available_space" -lt "$required_space" ]; then
         log_error "Insufficient disk space. Required: ${required_space}MB, Available: ${available_space}MB"
@@ -439,8 +468,10 @@ verify_file_integrity() {
         return 1
     fi
     
-    local original_hash=$(md5sum "$original_file" | cut -d' ' -f1)
-    local downloaded_hash=$(md5sum "$downloaded_file" | cut -d' ' -f1)
+    local original_hash
+    local downloaded_hash
+    original_hash=$(md5sum "$original_file" | cut -d' ' -f1)
+    downloaded_hash=$(md5sum "$downloaded_file" | cut -d' ' -f1)
     
     if [ "$original_hash" != "$downloaded_hash" ]; then
         log_error "File verification failed: Checksums do not match"
@@ -459,7 +490,7 @@ cleanup() {
     # Abort any ongoing multipart uploads
     for upload_info in "${ACTIVE_MULTIPART_UPLOADS[@]}"; do
         IFS='|' read -r bucket key upload_id <<< "$upload_info"
-        if [ ! -z "$upload_id" ]; then
+        if [ -n "$upload_id" ]; then
             log_verbose "Aborting multipart upload: $upload_id for key: $key"
             aws s3api abort-multipart-upload \
                 --bucket "$bucket" \
@@ -476,7 +507,7 @@ cleanup() {
         # Delete all versions and delete markers if versioning is enabled
         aws s3api list-object-versions --bucket "$BUCKET_NAME" --endpoint-url "$ENDPOINT_URL" --no-verify-ssl --output json 2>/dev/null | \
         jq -r '.Versions[]?, .DeleteMarkers[]? | "\(.Key)\t\(.VersionId)"' 2>/dev/null | while IFS=$'\t' read -r key version_id; do
-            if [ ! -z "$key" ] && [ ! -z "$version_id" ]; then
+            if [ -n "$key" ] && [ -n "$version_id" ]; then
                 aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$version_id" --endpoint-url "$ENDPOINT_URL" --no-verify-ssl 2>/dev/null || true
             fi
         done
@@ -559,8 +590,10 @@ setup() {
 run_test() {
     local test_name="$1"
     local test_function="$2"
-    local start_time=$(date +%s)
-    local start_time_readable=$(date '+%Y-%m-%d %H:%M:%S')
+    local start_time
+    local start_time_readable
+    start_time=$(date +%s)
+    start_time_readable=$(date '+%Y-%m-%d %H:%M:%S')
     
     log "Running test: $test_name"
     TEST_STATS_TOTAL=$((TEST_STATS_TOTAL + 1))
@@ -576,8 +609,10 @@ run_test() {
         result=1
     fi
     
-    local end_time=$(date +%s)
-    local end_time_readable=$(date '+%Y-%m-%d %H:%M:%S')
+    local end_time
+    local end_time_readable
+    end_time=$(date +%s)
+    end_time_readable=$(date '+%Y-%m-%d %H:%M:%S')
     local duration=$((end_time - start_time))
     
     log_timing "$test_name,$start_time_readable,$end_time_readable,$duration"
@@ -600,7 +635,8 @@ test_bucket_operations() {
     aws s3api head-bucket --bucket "$BUCKET_NAME" --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
     log_verbose "Testing ListBuckets..."
-    local bucket_found=$(aws s3api list-buckets --endpoint-url "$ENDPOINT_URL" --no-verify-ssl --query "Buckets[?Name=='$BUCKET_NAME'].Name" --output text)
+    local bucket_found
+    bucket_found=$(aws s3api list-buckets --endpoint-url "$ENDPOINT_URL" --no-verify-ssl --query "Buckets[?Name=='$BUCKET_NAME'].Name" --output text)
     if [ "$bucket_found" != "$BUCKET_NAME" ]; then
         log_error "Bucket not found in list-buckets output"
         return 1
@@ -617,7 +653,8 @@ test_bucket_versioning() {
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
     log_verbose "Testing GetBucketVersioning..."
-    local versioning_status=$(aws s3api get-bucket-versioning --bucket "$BUCKET_NAME" --endpoint-url "$ENDPOINT_URL" --no-verify-ssl --query 'Status' --output text)
+    local versioning_status
+    versioning_status=$(aws s3api get-bucket-versioning --bucket "$BUCKET_NAME" --endpoint-url "$ENDPOINT_URL" --no-verify-ssl --query 'Status' --output text)
     if [ "$versioning_status" != "Enabled" ]; then
         log_error "Bucket versioning not enabled properly"
         return 1
@@ -634,7 +671,8 @@ test_bucket_tagging() {
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
     log_verbose "Testing GetBucketTagging..."
-    local tag_count=$(aws s3api get-bucket-tagging --bucket "$BUCKET_NAME" --endpoint-url "$ENDPOINT_URL" --no-verify-ssl --query 'length(TagSet)' --output text)
+    local tag_count
+    tag_count=$(aws s3api get-bucket-tagging --bucket "$BUCKET_NAME" --endpoint-url "$ENDPOINT_URL" --no-verify-ssl --query 'length(TagSet)' --output text)
     if [ "$tag_count" != "2" ]; then
         log_error "Expected 2 bucket tags, found $tag_count"
         return 1
@@ -669,13 +707,15 @@ test_object_operations() {
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
     log_verbose "Testing HeadObject..."
-    local object_size=$(aws s3api head-object \
+    local object_size
+    local expected_size
+    object_size=$(aws s3api head-object \
         --bucket "$BUCKET_NAME" \
         --key "small-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
         --query 'ContentLength' --output text)
     
-    local expected_size=$(stat -c%s "$SMALL_FILE")
+    expected_size=$(stat -c%s "$SMALL_FILE")
     if [ "$object_size" != "$expected_size" ]; then
         log_error "Object size mismatch: expected $expected_size, got $object_size"
         return 1
@@ -719,7 +759,8 @@ test_object_versioning() {
         --body "${TEST_DIR}/version-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
-    local version1=$(aws s3api head-object \
+    local version1
+    version1=$(aws s3api head-object \
         --bucket "$BUCKET_NAME" \
         --key "version-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
@@ -733,7 +774,8 @@ test_object_versioning() {
         --body "${TEST_DIR}/version-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
-    local version2=$(aws s3api head-object \
+    local version2
+    version2=$(aws s3api head-object \
         --bucket "$BUCKET_NAME" \
         --key "version-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
@@ -752,7 +794,8 @@ test_object_versioning() {
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
         "${TEST_DIR}/version1-download.txt"
     
-    local downloaded_content=$(cat "${TEST_DIR}/version1-download.txt")
+    local downloaded_content
+    downloaded_content=$(cat "${TEST_DIR}/version1-download.txt")
     if [ "$downloaded_content" != "Version 1 content" ]; then
         log_error "Downloaded version 1 content doesn't match expected content"
         return 1
@@ -771,7 +814,8 @@ test_object_tagging() {
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
     log_verbose "Testing GetObjectTagging..."
-    local tag_count=$(aws s3api get-object-tagging \
+    local tag_count
+    tag_count=$(aws s3api get-object-tagging \
         --bucket "$BUCKET_NAME" \
         --key "small-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
@@ -789,7 +833,8 @@ test_object_tagging() {
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
     # Verify tags are deleted
-    local remaining_tags=$(aws s3api get-object-tagging \
+    local remaining_tags
+    remaining_tags=$(aws s3api get-object-tagging \
         --bucket "$BUCKET_NAME" \
         --key "small-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
@@ -806,7 +851,8 @@ test_object_tagging() {
 # Multipart Upload Tests
 test_multipart_upload() {
     log_verbose "Testing CreateMultipartUpload..."
-    local multipart_upload_id=$(aws s3api create-multipart-upload \
+    local multipart_upload_id
+    multipart_upload_id=$(aws s3api create-multipart-upload \
         --bucket "$BUCKET_NAME" \
         --key "large-multipart-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
@@ -818,7 +864,8 @@ test_multipart_upload() {
     log_verbose "Created multipart upload with ID: $multipart_upload_id"
     
     log_verbose "Testing ListMultipartUploads..."
-    local upload_found=$(aws s3api list-multipart-uploads \
+    local upload_found
+    upload_found=$(aws s3api list-multipart-uploads \
         --bucket "$BUCKET_NAME" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
         --query "Uploads[?UploadId=='$multipart_upload_id'].UploadId" --output text)
@@ -840,7 +887,8 @@ test_multipart_upload() {
         if [ -f "$part_file" ]; then
             log_verbose "Testing UploadPart (part $part_number)..."
             
-            local etag=$(aws s3api upload-part \
+            local etag
+            etag=$(aws s3api upload-part \
                 --bucket "$BUCKET_NAME" \
                 --key "large-multipart-test.txt" \
                 --part-number $part_number \
@@ -866,7 +914,8 @@ test_multipart_upload() {
     fi
     
     log_verbose "Testing ListParts..."
-    local parts_count=$(aws s3api list-parts \
+    local parts_count
+    parts_count=$(aws s3api list-parts \
         --bucket "$BUCKET_NAME" \
         --key "large-multipart-test.txt" \
         --upload-id "$multipart_upload_id" \
@@ -912,7 +961,8 @@ test_abort_multipart_upload() {
     log_verbose "Testing AbortMultipartUpload..."
     
     # Create another multipart upload to abort
-    local abort_upload_id=$(aws s3api create-multipart-upload \
+    local abort_upload_id
+    abort_upload_id=$(aws s3api create-multipart-upload \
         --bucket "$BUCKET_NAME" \
         --key "abort-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
@@ -947,12 +997,13 @@ test_abort_multipart_upload() {
     ACTIVE_MULTIPART_UPLOADS=("${temp_array[@]}")
     
     # Verify upload was aborted
-    local remaining_uploads=$(aws s3api list-multipart-uploads \
+    local remaining_uploads
+    remaining_uploads=$(aws s3api list-multipart-uploads \
         --bucket "$BUCKET_NAME" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
         --query "Uploads[?UploadId=='$abort_upload_id'].UploadId" --output text)
     
-    if [ ! -z "$remaining_uploads" ]; then
+    if [ -n "$remaining_uploads" ]; then
         log_error "Multipart upload was not properly aborted"
         return 1
     fi
@@ -1006,8 +1057,10 @@ EOF
 
 # Print test statistics
 print_test_statistics() {
-    local test_end_time=$(date +%s)
-    local total_duration=$((test_end_time - TEST_START_TIME))
+    local test_end_time
+    test_end_time=$(date +%s)
+    local total_duration
+    total_duration=$((test_end_time - TEST_START_TIME))
     
     echo ""
     echo "=========================================="
