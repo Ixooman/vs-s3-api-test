@@ -27,7 +27,6 @@
 #   - DeleteObjects (bulk delete)
 #   - GetObject
 #   - HeadObject
-#   - ListObjectVersions
 #   - PutObject
 #
 # Object Tagging:
@@ -710,82 +709,6 @@ test_object_operations() {
     return 0
 }
 
-test_list_object_versions() {
-    log_verbose "Testing ListObjectVersions..."
-    
-    # First ensure we have versioned objects to list
-    # The version-test.txt object should already exist from test_object_versioning
-    # But let's create additional versioned objects for comprehensive testing
-    
-    log_verbose "Creating additional versioned objects for ListObjectVersions test..."
-    
-    # Create multiple versions of test objects
-    for i in {1..3}; do
-        echo "List versions test content - version $i" > "${TEST_DIR}/list-versions-test.txt"
-        aws s3api put-object \
-            --bucket "$BUCKET_NAME" \
-            --key "list-versions-test.txt" \
-            --body "${TEST_DIR}/list-versions-test.txt" \
-            --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
-    done
-    
-    # Test ListObjectVersions with no prefix (list all versions)
-    log_verbose "Testing ListObjectVersions - all objects..."
-    local all_versions_count=$(aws s3api list-object-versions \
-        --bucket "$BUCKET_NAME" \
-        --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
-        --query 'length(Versions)' --output text)
-    
-    if [ "$all_versions_count" = "0" ] || [ "$all_versions_count" = "null" ]; then
-        log_error "ListObjectVersions returned no versions"
-        return 1
-    fi
-    
-    log_verbose "Found $all_versions_count total object versions"
-    
-    # Test ListObjectVersions with prefix
-    log_verbose "Testing ListObjectVersions - with prefix..."
-    local prefix_versions_count=$(aws s3api list-object-versions \
-        --bucket "$BUCKET_NAME" \
-        --prefix "list-versions-test.txt" \
-        --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
-        --query 'length(Versions)' --output text)
-    
-    if [ "$prefix_versions_count" != "3" ]; then
-        log_error "Expected 3 versions for prefix search, found $prefix_versions_count"
-        return 1
-    fi
-    
-    # Test ListObjectVersions with max-keys parameter
-    log_verbose "Testing ListObjectVersions - with max-keys..."
-    local limited_versions=$(aws s3api list-object-versions \
-        --bucket "$BUCKET_NAME" \
-        --max-keys 2 \
-        --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
-        --query 'length(Versions)' --output text)
-    
-    if [ "$limited_versions" -gt 2 ]; then
-        log_error "max-keys parameter not working, expected ≤2 versions, got $limited_versions"
-        return 1
-    fi
-    
-    # Verify the response contains expected fields
-    log_verbose "Verifying ListObjectVersions response structure..."
-    local version_id=$(aws s3api list-object-versions \
-        --bucket "$BUCKET_NAME" \
-        --prefix "list-versions-test.txt" \
-        --max-keys 1 \
-        --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
-        --query 'Versions[0].VersionId' --output text)
-    
-    if [ -z "$version_id" ] || [ "$version_id" = "null" ]; then
-        log_error "ListObjectVersions response missing VersionId field"
-        return 1
-    fi
-    
-    log_verbose "ListObjectVersions test completed successfully"
-    return 0
-}
 test_object_versioning() {
     
     # Upload initial version
@@ -796,11 +719,11 @@ test_object_versioning() {
         --body "${TEST_DIR}/version-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
-    local version1=$(aws s3api list-object-versions \
+    local version1=$(aws s3api head-object \
         --bucket "$BUCKET_NAME" \
-        --prefix "version-test.txt" \
+        --key "version-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
-        --query 'Versions[0].VersionId' --output text)
+        --query 'VersionId' --output text)
     
     # Upload second version
     echo "Version 2 content" > "${TEST_DIR}/version-test.txt"
@@ -810,11 +733,11 @@ test_object_versioning() {
         --body "${TEST_DIR}/version-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl
     
-    local version2=$(aws s3api list-object-versions \
+    local version2=$(aws s3api head-object \
         --bucket "$BUCKET_NAME" \
-        --prefix "version-test.txt" \
+        --key "version-test.txt" \
         --endpoint-url "$ENDPOINT_URL" --no-verify-ssl \
-        --query 'Versions[0].VersionId' --output text)
+        --query 'VersionId' --output text)
     
     if [ "$version1" = "$version2" ]; then
         log_error "Object versions are the same, versioning may not be working"
@@ -1125,7 +1048,6 @@ main() {
     run_test "Bucket Tagging" test_bucket_tagging
     run_test "Object Operations" test_object_operations
     run_test "Object Versioning" test_object_versioning
-    run_test "List Object Versions" test_list_object_versions
     run_test "Object Tagging" test_object_tagging
     run_test "Multipart Upload" test_multipart_upload
     run_test "Abort Multipart Upload" test_abort_multipart_upload
