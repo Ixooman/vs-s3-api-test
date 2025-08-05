@@ -12,6 +12,6 @@ echo "Endpoint: $ENDPOINT_URL"
 echo "======================================"
 
 echo "=== Bucket Listing ==="
-$AWS_CMD s3api list-buckets --endpoint-url $ENDPOINT_URL
+$AWS_CMD s3api list-buckets --endpoint-url "$ENDPOINT_URL"
 
 echo -e "\n=== Test Completed ==="
