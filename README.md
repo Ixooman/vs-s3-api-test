@@ -2,6 +2,8 @@
 
 A comprehensive testing framework for verifying S3 API compatibility in custom storage systems. This tool helps developers and system administrators validate that their S3-compatible storage implementations correctly handle the full range of S3 operations.
 
+The framework includes both a modern Python-based testing framework and legacy AWS CLI test scripts for comprehensive S3 API validation.
+
 ## Features
 
 - **Comprehensive Testing**: Tests all major S3 operations including buckets, objects, multipart uploads, versioning, tagging, and more
@@ -139,7 +141,58 @@ error_conditions = true
 sync = true
 ```
 
-## Command Line Options
+## AWS CLI Testing Scripts
+
+In addition to the Python framework, the project includes several specialized AWS CLI-based testing scripts for specific S3 testing scenarios:
+
+### Legacy AWS CLI Test Suite
+- **S3_compatibility.txt**: Original comprehensive AWS CLI test script with sequential operations covering bucket operations, object lifecycle management, multipart uploads, versioning, tagging, and object attributes
+
+### Advanced Multipart Upload Testing
+
+#### `scripts/max_object_multipart_probe.sh`
+Comprehensive multipart upload testing for large objects with dynamic part sizing:
+- Tests objects from 100MB up to multiple terabytes
+- Dynamic part sizing: 64MB (< 1GB), 128MB (< 10GB), 256MB (< 100GB), 512MB (< 1TB), 1024MB (< 5TB), 2048MB (≥ 5TB)
+- Support for object size ranges with stepping
+- Full debug output and detailed progress reporting
+- Automatic cleanup of test objects
+
+```bash
+# Test multipart uploads for objects ranging from 100MB to 1GB with 100MB steps
+scripts/max_object_multipart_probe.sh --bucket test-bucket --min 100mb --max 1gb --step 100mb --debug
+
+# Test with cleanup
+scripts/max_object_multipart_probe.sh --bucket test-bucket --min 500mb --max 5gb --step 500mb --cleanup
+```
+
+#### `scripts/multipart_upload_check.sh`
+Single object multipart upload verification with checksum validation:
+- Creates and uploads a single object using multipart upload
+- Verifies upload correctness through two verification modes:
+  - **Hybrid (default)**: Fast verification comparing original MD5 with S3's ETag (no download)
+  - **Full verification**: Downloads object and validates MD5 matches original (thorough end-to-end check)
+- Optional automatic cleanup
+- Flexible part sizing configuration
+
+```bash
+# Upload 500MB object with 64MB parts (hybrid verification)
+scripts/multipart_upload_check.sh --bucket test-bucket --size 500mb --part 64mb
+
+# Full verification mode with cleanup
+scripts/multipart_upload_check.sh --bucket test-bucket --size 1gb --part 128mb --verify-full --cleanup
+
+# Debug mode to see all AWS CLI commands
+scripts/multipart_upload_check.sh --bucket test-bucket --size 100mb --part 64mb --debug
+```
+
+### Script Prerequisites
+- AWS CLI installed and configured
+- S3-compatible endpoint access with valid credentials
+- Sufficient storage space for test objects
+- Network connectivity to the S3 endpoint
+
+## Python Framework: Command Line Options
 
 ### Basic Usage
 ```bash
