@@ -257,7 +257,7 @@ upload_part() {
         return 1
     fi
 
-    echo "$output" | grep -oP '"ETag":\s*"\K[^"]+' || return 1
+    echo "$output" | grep -oP '"ETag":\s*"\\"\K[^\\]+' || return 1
 }
 
 # Complete multipart upload
@@ -377,9 +377,14 @@ upload_multipart() {
         local etag=""
 
         while ((attempt <= MAX_RETRIES)); do
-            etag=$(upload_part "$part_file" "$s3_key" "$upload_id" "$part_num" 2>&1)
+            etag=$(upload_part "$part_file" "$s3_key" "$upload_id" "$part_num")
             if [[ -n "$etag" ]]; then
-                echo -e "${GREEN}✓ Part $part_num uploaded (ETag: $etag)${NC}"
+                # Debug: show raw etag value
+                if [[ "$DEBUG" == true ]]; then
+                    echo "[DEBUG] Raw etag value: [$etag]" >&2
+                    echo "[DEBUG] etag length: ${#etag}" >&2
+                fi
+                printf "${GREEN}✓ Part %d uploaded (ETag: %s)${NC}\n" "$part_num" "$etag"
                 etags+=("$etag")
                 break
             else
@@ -414,8 +419,14 @@ upload_multipart() {
     echo -e "${BLUE}Completing multipart upload...${NC}"
     if complete_multipart_upload "$s3_key" "$upload_id" "$parts_json"; then
         echo -e "${GREEN}✓ Multipart upload completed${NC}"
-        # Remove from active uploads
-        ACTIVE_UPLOADS=("${ACTIVE_UPLOADS[@]/$s3_key:$upload_id}")
+        # Remove from active uploads by rebuilding array without this entry
+        local -a new_uploads=()
+        for upload_info in "${ACTIVE_UPLOADS[@]}"; do
+            if [[ "$upload_info" != "$s3_key:$upload_id" ]]; then
+                new_uploads+=("$upload_info")
+            fi
+        done
+        ACTIVE_UPLOADS=("${new_uploads[@]}")
         return 0
     else
         echo -e "${RED}✗ Failed to complete multipart upload${NC}"
