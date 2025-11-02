@@ -31,9 +31,9 @@ Usage: $0 --bucket <bucket-name> --min <size> --max <size> --step <size> [option
 
 Required arguments:
   --bucket <name>       S3 bucket name
-  --min <size>          Minimum object size (e.g., 100mb, 1gb, 10gb) - must be >= 100mb
-  --max <size>          Maximum object size (e.g., 1gb, 10gb, 100gb)
-  --step <size>         Size increment step (e.g., 100mb, 1gb)
+  --min <size>          Minimum object size (e.g., 100mb, 1gb, 10gb, 1tb) - must be >= 100mb
+  --max <size>          Maximum object size (e.g., 1gb, 10gb, 100gb, 5tb)
+  --step <size>         Size increment step (e.g., 100mb, 1gb, 500gb, 1tb)
 
 Optional arguments:
   --endpoint <url>      S3 endpoint URL (default: http://192.168.10.81)
@@ -51,8 +51,9 @@ Multipart Part Sizing Rules:
   Object < 5TB    → 1024MB parts
   Object >= 5TB   → 2048MB parts
 
-Example:
+Examples:
   $0 --bucket test-bucket --min 100mb --max 1gb --step 100mb --cleanup
+  $0 --bucket test-bucket --min 1gb --max 10tb --step 1gb --debug
 
 AWS Credentials:
   The script uses AWS CLI's standard credential resolution:
