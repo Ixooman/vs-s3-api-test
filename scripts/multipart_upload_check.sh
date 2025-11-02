@@ -175,7 +175,7 @@ upload_part() {
 
     output=$(aws s3api upload-part \
         --bucket "$BUCKET" \
-        --key "$$s3_key" \
+        --key "$s3_key" \
         --part-number "$part_number" \
         --body "$filename" \
         --upload-id "$upload_id" \
