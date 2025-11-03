@@ -47,9 +47,10 @@ Multipart Part Sizing Rules:
   Object < 1GB    → 64MB parts
   Object < 10GB   → 128MB parts
   Object < 100GB  → 256MB parts
-  Object < 1TB    → 512MB parts
-  Object < 5TB    → 1024MB parts
-  Object >= 5TB   → 2048MB parts
+  Object < 500GB  → 512MB parts
+  Object < 1TB    → 1024MB parts
+  Object < 5TB    → 2048MB parts
+  Object >= 5TB   → 4096MB parts
 
 Examples:
   $0 --bucket test-bucket --min 100mb --max 1gb --step 100mb --cleanup
@@ -149,24 +150,30 @@ calculate_part_size() {
     local object_size=$1
     local part_size
 
-    if ((object_size < 1073741824)); then
-        # < 1GB: use 64MB parts
-        part_size=$((64 * 1024 * 1024))
-    elif ((object_size < 10737418240)); then
-        # < 10GB: use 128MB parts
-        part_size=$((128 * 1024 * 1024))
-    elif ((object_size < 107374182400)); then
-        # < 100GB: use 256MB parts
-        part_size=$((256 * 1024 * 1024))
-    elif ((object_size < 1099511627776)); then
-        # < 1TB: use 512MB parts
+    if ((object_size < 107374182400)); then
+        # < 100GB: keep existing rules (64MB-256MB based on size)
+        if ((object_size < 1073741824)); then
+            # < 1GB: use 64MB parts
+            part_size=$((64 * 1024 * 1024))
+        elif ((object_size < 10737418240)); then
+            # < 10GB: use 128MB parts
+            part_size=$((128 * 1024 * 1024))
+        else
+            # < 100GB: use 256MB parts
+            part_size=$((256 * 1024 * 1024))
+        fi
+    elif ((object_size < 536870912000)); then
+        # < 500GB: use 512MB parts
         part_size=$((512 * 1024 * 1024))
-    elif ((object_size < 5497558138880)); then
-        # < 5TB: use 1024MB parts
+    elif ((object_size < 1099511627776)); then
+        # < 1TB: use 1024MB parts
         part_size=$((1024 * 1024 * 1024))
-    else
-        # >= 5TB: use 2048MB parts
+    elif ((object_size < 5497558138880)); then
+        # < 5TB: use 2048MB parts
         part_size=$((2048 * 1024 * 1024))
+    else
+        # >= 5TB: use 4096MB parts
+        part_size=$((4096 * 1024 * 1024))
     fi
 
     echo "$part_size"
