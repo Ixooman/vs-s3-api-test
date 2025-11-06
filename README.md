@@ -157,6 +157,7 @@ For detailed documentation of all available scripts, usage examples, and best pr
   - `multipart_upload_check.sh` - Single object verification with MD5 validation
   - `max_object_multipart_probe.sh` - Comprehensive testing with dynamic part sizing
   - `test_multipart.sh` - Quick multipart support check
+- **Bulk Upload Testing**: `put_bunch_objects.sh` - Upload multiple objects for stress/performance testing
 - **API Method Testing**: `spec_methods_tester.sh` - Test specific S3 API methods
 - **Cleanup**: `cleanup_all.sh` - Remove all test resources
 - **Legacy Test Suite**: `S3_compatibility.txt` - Original AWS CLI test script

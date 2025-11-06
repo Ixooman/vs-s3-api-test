@@ -274,6 +274,71 @@ Tests maximum single-put object size capabilities.
 
 ---
 
+### Bulk Upload Testing
+
+#### `put_bunch_objects.sh`
+Bulk object upload testing with configurable unique template files.
+
+**Purpose**: Upload a specified number of objects to S3 for bulk upload testing, stress testing, and performance benchmarking. Uses a configurable number of unique template files that are cycled through to upload the desired object count.
+
+**Key Features**:
+- Generate multiple unique template files with random data
+- Upload specified number of objects by cycling through templates
+- Each uploaded object gets a unique S3 key
+- Automatic template file cleanup on exit (via trap handler)
+- Optional S3 object cleanup after testing
+- Detailed progress tracking and summary statistics
+- Debug mode for AWS CLI command visibility
+
+**Usage**:
+```bash
+./put_bunch_objects.sh --bucket <bucket-name> --size <size> --count <number> [options]
+```
+
+**Options**:
+- `--bucket <name>`: Target bucket name (required)
+- `--size <size>`: Size of each object (e.g., 10kb, 5mb, 1gb) - all objects same size
+- `--count/-n <number>`: Number of objects to upload (required)
+- `--unique <number>`: Number of unique template files (default: 1)
+- `--endpoint <url>`: S3 endpoint URL (default: http://192.168.10.81)
+- `--cleanup`: Delete uploaded S3 objects after testing
+- `--debug`: Show full AWS CLI commands and responses
+
+**Examples**:
+
+Upload 100 objects of 10MB each using a single template file:
+```bash
+./put_bunch_objects.sh --bucket test-bucket --size 10mb --count 100
+```
+
+Upload 50 objects using 5 unique template files with cleanup:
+```bash
+./put_bunch_objects.sh --bucket test-bucket --size 5mb -n 50 --unique 5 --cleanup
+```
+
+Upload with debug output:
+```bash
+./put_bunch_objects.sh --bucket test-bucket --size 1gb --count 10 --unique 3 --debug
+```
+
+**How Template Cycling Works**:
+
+When `--unique` is less than `--count`, the script cycles through template files:
+- Example: `--unique 3 --count 10` creates 3 template files
+- Uploads 10 objects using pattern: template1, template2, template3, template1, template2, template3, template1, template2, template3, template1
+- Each upload gets a unique S3 key name (e.g., `object_1_abc123.data`, `object_2_def456.data`)
+
+**Use Cases**:
+- **Bulk upload testing**: Validate handling of many simultaneous/sequential uploads
+- **Performance benchmarking**: Measure upload throughput and timing
+- **Stress testing**: Test S3 endpoint under load with many objects
+- **Storage capacity testing**: Fill buckets to test storage limits
+- **Template reuse efficiency**: Test with fewer unique files to save disk space and generation time
+
+**Output**: Summary report showing successful/failed uploads, total upload time, and average time per object.
+
+---
+
 ### Utility Scripts
 
 #### `cleanup_all.sh`
@@ -335,6 +400,18 @@ Documentation file containing additional information about the base_check.sh scr
 
 # Test range of object sizes
 ./max_object_multipart_probe.sh --bucket test-bucket --min 100mb --max 10gb --step 1gb
+```
+
+### Bulk Upload and Performance Testing
+```bash
+# Upload 100 objects of 10MB each for stress testing
+./put_bunch_objects.sh --bucket test-bucket --size 10mb --count 100
+
+# Upload with multiple unique templates and cleanup
+./put_bunch_objects.sh --bucket test-bucket --size 5mb -n 50 --unique 5 --cleanup
+
+# Performance benchmarking with debug output
+./put_bunch_objects.sh --bucket test-bucket --size 1gb --count 10 --unique 3 --debug
 ```
 
 ### Complete API Method Testing
